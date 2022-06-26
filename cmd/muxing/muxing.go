@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -21,8 +22,14 @@ main function reads host/port from env just for an example, flavor it following 
 func Start(host string, port int) {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/name/{PARAM}", returnParameter).Methods(http.MethodGet)
+	router.HandleFunc("/bad", badRequest).Methods(http.MethodGet)
+
+	router.HandleFunc("/data", returnFromRequestBody).Methods(http.MethodPost)
+	router.HandleFunc("/headers", returnFromRequestHeaders).Methods(http.MethodPost)
+
 	log.Println(fmt.Printf("Starting API server on %s:%d\n", host, port))
-	if err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), router); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), router); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -35,4 +42,43 @@ func main() {
 		port = 8081
 	}
 	Start(host, port)
+}
+
+func returnParameter(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	finalString := "Hello, " + params["PARAM"] + "!"
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(finalString))
+}
+
+func badRequest(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func returnFromRequestBody(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	finalString := "I got message:\n" + string(body)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(finalString))
+}
+
+func returnFromRequestHeaders(w http.ResponseWriter, r *http.Request) {
+	a, err := strconv.Atoi(r.Header.Get("a"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	b, err := strconv.Atoi(r.Header.Get("b"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	result := a + b
+
+	w.Header().Add("a+b", strconv.Itoa(result))
+	w.WriteHeader(http.StatusOK)
 }
